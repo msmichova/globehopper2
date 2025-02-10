@@ -1,25 +1,30 @@
 import { useEffect, useState } from "react";
-import { Box, Card, CardContent, Typography, Button, Grid, Drawer, Chip, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Select, MenuItem, FormControl, InputLabel } from "@mui/material";
+import {
+  Box,
+  Grid,
+  Typography,
+  Drawer,
+  TextField,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  SelectChangeEvent,
+} from "@mui/material";
 import TourForm from "../components/TourForm";
-import { collection, getDocs, updateDoc, deleteDoc, doc } from "firebase/firestore";
+import TourList from "../components/TourList";
+import EditTourDialog from "../components/EditTourDialog";
+import DeleteTourDialog from "../components/DeleteTourDialog";
+import { Tour } from "../types/types";
+import { mockUser } from "../mocks/mockUser";
+import {
+  collection,
+  deleteDoc,
+  doc,
+  getDocs,
+  updateDoc,
+} from "firebase/firestore";
 import { db } from "../firebase";
-
-interface Tour {
-  id: string;
-  name: string;
-  type: string;
-  description: string;
-  createdBy: string;
-  location: string;
-  guideName: string;
-}
-
-// Mock User (TODO: Replace with real authentication)
-// const mockUser = { id: "Y2a24jVPqW3UZVKBrxSo", name: "Chris", role: "guide", specialties: ["Boat Tour", "History Tour"] };
-const mockUser = { id: "m8vRPA2R7sXbXYttk0i1", name: "ADMIN", role: "admin", specialties: ["Boat Tour", "History Tour", "Private Car Tour", "Foodie Tour", "Drink Tour", "Art Tour"] };
-// const mockUser = { id: "iyIE8AxFzjk7OTNjIo7Z", name: "Jonny", role: "guide", specialties: ["Private Car Tour"] };
-// const mockUser = { id: "n36seRhNjZrgXXi04Qwq", name: "Martina", role: "guide", specialties: ["Foodie Tour", "Drink Tour"] };
-// const mockUser = { id: "hmWBOyJooVWZ26mHDiZk", name: "Vic", role: "guide", specialties: ["Art Tour"] };
 
 const ToursPage = () => {
   const [tours, setTours] = useState<Tour[]>([]);
@@ -27,16 +32,17 @@ const ToursPage = () => {
   const [openEditDialog, setOpenEditDialog] = useState(false);
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
   const [tourToDelete, setTourToDelete] = useState<Tour | null>(null);
- 
-  const handleTourAdded = (newTour: Tour) => {
-    setTours((prevTours) => [...prevTours, newTour]); // Add the new tour to the state
-  };
-  
+  const [filters, setFilters] = useState({
+    location: "",
+    type: "",
+    guideName: "",
+  });
+
   useEffect(() => {
     const fetchTours = async () => {
       try {
         const querySnapshot = await getDocs(collection(db, "tours"));
-        const toursData = querySnapshot.docs.map(doc => ({
+        const toursData = querySnapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
         })) as Tour[];
@@ -50,13 +56,15 @@ const ToursPage = () => {
     fetchTours();
   }, []);
 
-  // Handle Edit Click
+  const handleTourAdded = (newTour: Tour) => {
+    setTours((prevTours) => [...prevTours, newTour]);
+  };
+
   const handleEditClick = (tour: Tour) => {
     setEditingTour(tour);
     setOpenEditDialog(true);
   };
 
-  // Handle Delete Click
   const handleDeleteClick = (tour: Tour) => {
     setTourToDelete(tour);
     setOpenDeleteDialog(true);
@@ -76,7 +84,7 @@ const ToursPage = () => {
         guideName: editingTour.guideName,
       });
 
-      setTours(tours.map(t => (t.id === editingTour.id ? editingTour : t)));
+      setTours(tours.map((t) => (t.id === editingTour.id ? editingTour : t)));
       setOpenEditDialog(false);
       setEditingTour(null);
     } catch (error) {
@@ -91,8 +99,8 @@ const ToursPage = () => {
     try {
       const tourRef = doc(db, "tours", tourToDelete.id);
       await deleteDoc(tourRef);
-      
-      setTours(tours.filter(t => t.id !== tourToDelete.id));
+
+      setTours(tours.filter((t) => t.id !== tourToDelete.id));
       setOpenDeleteDialog(false);
       setTourToDelete(null);
     } catch (error) {
@@ -100,67 +108,86 @@ const ToursPage = () => {
     }
   };
 
+  const handleFilterChange = (
+    event: SelectChangeEvent<string> | React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const { name, value } = event.target;
+    setFilters((prevFilters) => ({
+      ...prevFilters,
+      [name]: value,
+    }));
+  };
+
+  const filteredTours = tours.filter((tour) => {
+    return (
+      (filters.location === "" ||
+        tour.location.toLowerCase().includes(filters.location.toLowerCase())) &&
+      (filters.type === "" || tour.type === filters.type) &&
+      (filters.guideName === "" ||
+        tour.guideName.toLowerCase().includes(filters.guideName.toLowerCase()))
+    );
+  });
+
   return (
     <Box sx={{ display: "flex", height: "100vh" }}>
-      {/* Tour List */}
       <Box sx={{ flex: 1, padding: 3 }}>
         <Typography variant="h4" gutterBottom>
           Available Tours
         </Typography>
+        <Box sx={{ display: "flex", gap: 2, marginBottom: 4 }}>
+          <TextField
+            label="Location"
+            name="location"
+            value={filters.location}
+            onChange={(e) =>
+              handleFilterChange(e as React.ChangeEvent<HTMLInputElement>)
+            }
+            fullWidth
+          />
+
+          <FormControl fullWidth>
+            <InputLabel>Tour Type</InputLabel>
+            <Select
+              name="type"
+              value={filters.type}
+              onChange={(e) =>
+                handleFilterChange(e as SelectChangeEvent<string>)
+              }
+            >
+              <MenuItem value="">All</MenuItem>
+              <MenuItem value="Boat Tour">Boat Tour</MenuItem>
+              <MenuItem value="History Tour">History Tour</MenuItem>
+              <MenuItem value="Private Car Tour">Private Car Tour</MenuItem>
+              <MenuItem value="Foodie Tour">Foodie Tour</MenuItem>
+              <MenuItem value="Drink Tour">Drink Tour</MenuItem>
+              <MenuItem value="Art Tour">Art Tour</MenuItem>
+            </Select>
+          </FormControl>
+
+          <TextField
+            label="Guide Name"
+            name="guideName"
+            value={filters.guideName}
+            onChange={(e) =>
+              handleFilterChange(e as React.ChangeEvent<HTMLInputElement>)
+            }
+            fullWidth
+          />
+        </Box>
 
         <Grid container spacing={2}>
-          {tours.map((tour) => (
-            <Grid item xs={12} sm={6} md={4} key={tour.id}>
-              <Card sx={{ padding: 2, position: "relative" }}>
-                <CardContent>
-                    {/* @ts-ignore */}
-                    {mockUser && mockUser?.id === tour.createdBy && (
-                    <Chip 
-                      label="My Tour" 
-                      color="primary" 
-                      size="small" 
-                      sx={{ position: "absolute", top: 8, right: 8 }} 
-                    />
-                     )}
-
-                  <Typography variant="h6">{tour.name}</Typography>
-                  <Typography color="textSecondary">{tour.type} with {tour.guideName} - {tour.location}</Typography>
-                  <Typography variant="body2" sx={{ marginTop: 1 }}>
-                    {tour.description}
-                  </Typography>
-                  {/* @ts-ignore */}
-                  {(mockUser?.id === tour.createdBy || mockUser.role === "admin") && (
-                    <>
-                      <Button 
-                        variant="outlined" 
-                        color="primary" 
-                        onClick={() => handleEditClick(tour)} 
-                        sx={{ marginTop: 1, marginRight: 1 }}
-                      >
-                        Edit
-                      </Button>
-
-                      <Button 
-                        variant="outlined" 
-                        color="error" 
-                        onClick={() => handleDeleteClick(tour)} 
-                        sx={{ marginTop: 1 }}
-                      >
-                        Delete
-                      </Button>
-                    </>
-                  )}
-                </CardContent>
-              </Card>
-            </Grid>
-          ))}
+          <TourList
+            tours={filteredTours}
+            mockUser={mockUser}
+            onEditClick={handleEditClick}
+            onDeleteClick={handleDeleteClick}
+          />
         </Grid>
       </Box>
 
-      {/* Tour Form */}
-      <Drawer 
-        variant="permanent" 
-        anchor="right"   
+      <Drawer
+        variant="permanent"
+        anchor="right"
         sx={{
           width: 300,
           flexShrink: 0,
@@ -171,14 +198,15 @@ const ToursPage = () => {
             top: 64,
             height: "calc(100% - 64px)",
           },
-        }}>
-        {mockUser && (mockUser?.role === "guide" || mockUser?.role === "admin") ? (
-            <>
+        }}
+      >
+        {mockUser &&
+        (mockUser.role === "guide" || mockUser.role === "admin") ? (
+          <>
             <Typography variant="h6">Add a Tour</Typography>
-            {/* @ts-ignore */}
-            <Typography variant="body2">Logged in: {mockUser?.name}</Typography>
+            <Typography variant="body2">Logged in: {mockUser.name}</Typography>
             <TourForm loggedInUser={mockUser} onTourAdded={handleTourAdded} />
-            </>
+          </>
         ) : (
           <Typography variant="body2" color="textSecondary">
             Log in as a guide or admin to add a tour.
@@ -186,43 +214,21 @@ const ToursPage = () => {
         )}
       </Drawer>
 
-      {/* Edit Tour Dialog */}
-      <Dialog open={openEditDialog} onClose={() => setOpenEditDialog(false)}>
-        <DialogTitle>Edit Tour</DialogTitle>
-        <DialogContent>
-          <TextField label="Name" fullWidth margin="dense" value={editingTour?.name || ""} onChange={(e) => setEditingTour({ ...editingTour!, name: e.target.value })} />
-          <TextField label="Location" fullWidth margin="dense" value={editingTour?.location || ""} onChange={(e) => setEditingTour({ ...editingTour!, location: e.target.value })} />
-          <FormControl fullWidth margin="normal" required>
-            <InputLabel>Tour Type</InputLabel>
-            <Select label="Type" name="type" value={editingTour?.type || ""} onChange={(e) => setEditingTour({ ...editingTour!, type: e.target.value })}>
-                {/* @ts-ignore */}
-                {mockUser && mockUser?.specialties?.map((type) => (
-                    <MenuItem key={type} value={type}>
-                    {type}
-                    </MenuItem>
-                ))}
-            </Select>
-          </FormControl>
+      <EditTourDialog
+        open={openEditDialog}
+        onClose={() => setOpenEditDialog(false)}
+        editingTour={editingTour}
+        setEditingTour={setEditingTour}
+        mockUser={mockUser}
+        handleSaveEdit={handleSaveEdit}
+      />
 
-          <TextField label="Description" fullWidth margin="dense" multiline value={editingTour?.description || ""} onChange={(e) => setEditingTour({ ...editingTour!, description: e.target.value })} />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpenEditDialog(false)}>Cancel</Button>
-          <Button onClick={handleSaveEdit} color="primary">Save</Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={openDeleteDialog} onClose={() => setOpenDeleteDialog(false)}>
-        <DialogTitle>Confirm Deletion</DialogTitle>
-        <DialogContent>
-          Are you sure you want to delete "{tourToDelete?.name}"?
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpenDeleteDialog(false)}>Cancel</Button>
-          <Button onClick={handleConfirmDelete} color="error">Delete</Button>
-        </DialogActions>
-      </Dialog>
+      <DeleteTourDialog
+        open={openDeleteDialog}
+        onClose={() => setOpenDeleteDialog(false)}
+        tour={tourToDelete}
+        handleConfirmDelete={handleConfirmDelete}
+      />
     </Box>
   );
 };

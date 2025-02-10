@@ -5,14 +5,28 @@
 //   { id: "martina", name: "Martina", role: "guide", specialties: ["Foodie Tour", "Drink Tour"] },
 //   { id: "vic", name: "Vic", role: "guide", specialties: ["Art Tour"] }
 // ];
-
 import { useState } from "react";
 import { db } from "../firebase";
 import { collection, addDoc } from "firebase/firestore";
-import { TextField, Button, FormControl, InputLabel, Select, MenuItem, SelectChangeEvent } from "@mui/material";
+import {
+  TextField,
+  Button,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  SelectChangeEvent,
+  Typography,
+  Box,
+} from "@mui/material";
 
 interface TourFormProps {
-  loggedInUser: { id: string; name: string; role: string; specialties: string[] };
+  loggedInUser: {
+    id: string;
+    name: string;
+    role: string;
+    specialties?: string[];
+  };
   onTourAdded: (newTour: any) => void;
 }
 
@@ -22,12 +36,40 @@ const TourForm = ({ loggedInUser, onTourAdded }: TourFormProps) => {
     type: "",
     description: "",
     location: "",
+    meetingPoint: {
+      latitude: "",
+      longitude: "",
+      address: "",
+    },
     guideName: loggedInUser.name,
     createdBy: loggedInUser.id,
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setTour((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+    const { name, value } = e.target;
+
+    if (["latitude", "longitude"].includes(name)) {
+      // Convert latitude & longitude to numbers
+      setTour((prev) => ({
+        ...prev,
+        meetingPoint: {
+          ...prev.meetingPoint,
+          [name]: value === "" ? "" : parseFloat(value), // Convert to number
+        },
+      }));
+    } else if (name === "address") {
+      // Handle address update
+      setTour((prev) => ({
+        ...prev,
+        meetingPoint: {
+          ...prev.meetingPoint,
+          [name]: value,
+        },
+      }));
+    } else {
+      // Handle other fields
+      setTour((prev) => ({ ...prev, [name]: value }));
+    }
   };
 
   const handleSelectChange = (e: SelectChangeEvent<string>) => {
@@ -39,8 +81,20 @@ const TourForm = ({ loggedInUser, onTourAdded }: TourFormProps) => {
 
     try {
       const docRef = await addDoc(collection(db, "tours"), tour);
-      onTourAdded({ ...tour, id: docRef.id }); // Update UI instantly
-      setTour({ name: "", type: "", description: "", location: "", guideName: loggedInUser.name, createdBy: loggedInUser.id });
+      onTourAdded({ ...tour, id: docRef.id });
+      setTour({
+        name: "",
+        type: "",
+        description: "",
+        location: "",
+        meetingPoint: {
+          latitude: "",
+          longitude: "",
+          address: "",
+        },
+        guideName: loggedInUser.name,
+        createdBy: loggedInUser.id,
+      });
     } catch (error) {
       console.error("Error adding tour:", error);
     }
@@ -48,13 +102,29 @@ const TourForm = ({ loggedInUser, onTourAdded }: TourFormProps) => {
 
   return (
     <form onSubmit={handleSubmit}>
-      <TextField name="name" label="Tour Name" value={tour.name} onChange={handleChange} required fullWidth margin="normal" />
-      <TextField name="location" label="Location" value={tour.location} onChange={handleChange} required fullWidth margin="normal" />
-      
+      <TextField
+        name="name"
+        label="Tour Name"
+        value={tour.name}
+        onChange={handleChange}
+        required
+        fullWidth
+        margin="normal"
+      />
+      <TextField
+        name="location"
+        label="Location"
+        value={tour.location}
+        onChange={handleChange}
+        required
+        fullWidth
+        margin="normal"
+      />
+
       <FormControl fullWidth margin="normal" required>
         <InputLabel>Tour Type</InputLabel>
         <Select name="type" value={tour.type} onChange={handleSelectChange}>
-          {loggedInUser.specialties.map((type) => (
+          {loggedInUser.specialties?.map((type) => (
             <MenuItem key={type} value={type}>
               {type}
             </MenuItem>
@@ -62,8 +132,53 @@ const TourForm = ({ loggedInUser, onTourAdded }: TourFormProps) => {
         </Select>
       </FormControl>
 
-      <TextField name="description" label="Description" value={tour.description} onChange={handleChange} required fullWidth margin="normal" />
-      <Button type="submit" variant="contained" color="primary">Add Tour</Button>
+      <TextField
+        name="description"
+        label="Description"
+        value={tour.description}
+        onChange={handleChange}
+        required
+        fullWidth
+        margin="normal"
+      />
+
+      {/* Meeting Point Section */}
+      <Box mt={2} mb={2}>
+        <Typography variant="h6">Meeting Point</Typography>
+        <TextField
+          name="latitude"
+          label="Latitude"
+          type="number"
+          value={tour.meetingPoint.latitude}
+          onChange={handleChange}
+          required
+          fullWidth
+          margin="normal"
+        />
+        <TextField
+          name="longitude"
+          label="Longitude"
+          type="number"
+          value={tour.meetingPoint.longitude}
+          onChange={handleChange}
+          required
+          fullWidth
+          margin="normal"
+        />
+        <TextField
+          name="address"
+          label="Address"
+          value={tour.meetingPoint.address}
+          onChange={handleChange}
+          required
+          fullWidth
+          margin="normal"
+        />
+      </Box>
+
+      <Button type="submit" variant="contained" color="primary">
+        Add Tour
+      </Button>
     </form>
   );
 };
